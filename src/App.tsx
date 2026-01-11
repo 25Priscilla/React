@@ -12,12 +12,12 @@ function App() {
   const [artworks, setArtworks] = useState<Artwork[]>([])
   const [loading, setLoading] = useState(false)
 
-  // pagination state
+  // pagination
   const [page, setPage] = useState(0)
   const rows = 10
   const [totalRecords, setTotalRecords] = useState(0)
 
-  // 🔑 store ONLY selected IDs (no objects, no other pages)
+  // 🔑 store ONLY selected IDs
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   // dialog state
@@ -38,7 +38,7 @@ function App() {
       .catch(() => setLoading(false))
   }, [page])
 
-  // 🔹 restore selection for current page only
+  // 🔹 restore selection for current page
   const selectedRows = artworks.filter(a => selectedIds.has(a.id))
 
   // 🔹 handle checkbox select / deselect
@@ -62,7 +62,6 @@ function App() {
   const selectNRows = () => {
     const newSet = new Set(selectedIds)
 
-    // 🔒 cap selection to current page length
     const maxSelectable = artworks.length
     const count = Math.min(selectCount, maxSelectable)
 
@@ -83,9 +82,10 @@ function App() {
         style={{ marginBottom: '1rem' }}
       />
 
+      {/* ✅ UPDATED DataTable */}
       <DataTable
         value={artworks}
-        lazy                    // ✅ REQUIRED (server-side pagination)
+        lazy
         paginator
         rows={rows}
         totalRecords={totalRecords}
@@ -95,6 +95,7 @@ function App() {
         dataKey="id"
         selection={selectedRows}
         onSelectionChange={onSelectionChange}
+        selectionMode="checkbox"   // ✅ THIS FIXES THE BUILD ERROR
       >
         <Column selectionMode="multiple" headerStyle={{ width: '3rem' }} />
         <Column field="title" header="Title" />
