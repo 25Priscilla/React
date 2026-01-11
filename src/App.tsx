@@ -11,20 +11,23 @@ const API_URL = 'https://api.artic.edu/api/v1/artworks'
 function App() {
   const [artworks, setArtworks] = useState<Artwork[]>([])
   const [loading, setLoading] = useState(false)
+
+  // pagination state
   const [page, setPage] = useState(0)
+  const rows = 10
   const [totalRecords, setTotalRecords] = useState(0)
 
-  // 🔑 ONLY store selected IDs (important rule)
+  // 🔑 store ONLY selected IDs (no objects, no other pages)
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
+  // dialog state
   const [showDialog, setShowDialog] = useState(false)
   const [selectCount, setSelectCount] = useState<number>(0)
 
-  const rows = 10
-
-  // 🔹 Fetch data page-wise (NO PREFETCHING)
+  // 🔹 fetch ONLY current page (NO prefetching)
   useEffect(() => {
     setLoading(true)
+
     fetch(`${API_URL}?page=${page + 1}&limit=${rows}`)
       .then(res => res.json())
       .then(data => {
@@ -32,22 +35,39 @@ function App() {
         setTotalRecords(data.pagination.total)
         setLoading(false)
       })
+      .catch(() => setLoading(false))
   }, [page])
 
-  // 🔹 Selection logic for current page
+  // 🔹 restore selection for current page only
+  const selectedRows = artworks.filter(a => selectedIds.has(a.id))
+
+  // 🔹 handle checkbox select / deselect
   const onSelectionChange = (e: any) => {
     const newSet = new Set(selectedIds)
-    e.value.forEach((item: Artwork) => newSet.add(item.id))
+
+    // remove deselected rows from CURRENT page
+    artworks.forEach(a => {
+      if (!e.value.some((v: Artwork) => v.id === a.id)) {
+        newSet.delete(a.id)
+      }
+    })
+
+    // add selected rows
+    e.value.forEach((a: Artwork) => newSet.add(a.id))
+
     setSelectedIds(newSet)
   }
 
-  // 🔹 Restore selection on page change
-  const selectedRows = artworks.filter(a => selectedIds.has(a.id))
-
-  // 🔹 Select N rows from current page
+  // 🔹 custom select N rows (STRICTLY current page only)
   const selectNRows = () => {
     const newSet = new Set(selectedIds)
-    artworks.slice(0, selectCount).forEach(a => newSet.add(a.id))
+
+    // 🔒 cap selection to current page length
+    const maxSelectable = artworks.length
+    const count = Math.min(selectCount, maxSelectable)
+
+    artworks.slice(0, count).forEach(a => newSet.add(a.id))
+
     setSelectedIds(newSet)
     setShowDialog(false)
   }
@@ -57,7 +77,7 @@ function App() {
       <h2>Art Institute of Chicago – Artworks</h2>
 
       <Button
-        label="Select N Rows"
+        label="Select N Rows (Current Page Only)"
         icon="pi pi-check-square"
         onClick={() => setShowDialog(true)}
         style={{ marginBottom: '1rem' }}
@@ -65,16 +85,16 @@ function App() {
 
       <DataTable
         value={artworks}
-        loading={loading}
+        lazy                    // ✅ REQUIRED (server-side pagination)
         paginator
         rows={rows}
         totalRecords={totalRecords}
         first={page * rows}
         onPage={(e) => setPage(e.page ?? 0)}
+        loading={loading}
+        dataKey="id"
         selection={selectedRows}
         onSelectionChange={onSelectionChange}
-        dataKey="id"
-        selectionMode="checkbox"
       >
         <Column selectionMode="multiple" headerStyle={{ width: '3rem' }} />
         <Column field="title" header="Title" />
@@ -85,17 +105,23 @@ function App() {
         <Column field="date_end" header="End Date" />
       </DataTable>
 
-      {/* 🔹 Custom Overlay Panel */}
+      {/* Custom Select Dialog */}
       <Dialog
         header="Select Rows"
         visible={showDialog}
         onHide={() => setShowDialog(false)}
       >
+        <p style={{ fontSize: '0.9rem' }}>
+          Selection is limited to the current page only.
+        </p>
+
         <InputNumber
           value={selectCount}
           onValueChange={(e) => setSelectCount(e.value || 0)}
           placeholder="Enter number of rows"
+          min={0}
         />
+
         <br /><br />
         <Button label="Select" onClick={selectNRows} />
       </Dialog>
